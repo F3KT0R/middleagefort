@@ -1,0 +1,19 @@
+Mindegyik felszínháló esetében az alapméretezett kockából indultam ki és azt módosítottam. Módosításaim fő elemei az EXTRUDE(e billentyű), AZ INSET(i billentyű) ÉS A GRAB(g billentyű) parancsok voltak.
+Ezeket a parancsokat mindig egy adott tengely mentén végeztem, vagy az x, vagy az y vagy a z.
+
+Mindhárom blenderben készített objektumom teteje "sakk"mintásan(checkered pattern) kiágaskodik, mint a régi váraknál ahogyan az szokás is. ezt is az EXTRUDE paranccsal oldottam meg, ám előtte az arcokra(faces) használtam a SUBDIVIDE utasítást, hogy felossza kisebb egységekre.
+Mikor az utolsó EXTRUDE parancsot is elvégeztem és mielőtt felosztottam volna az utolsó arcot a SUBDIVIDE paranccsal, egy INSET parancsot is végeztem rajta, hogy az így kapott belső kockát az EXTRUDE paranccsal befelé nyomtam, hogy egy padlózatot képezzek az épületek tetején, amikre emberek állhatnának.
+Majd ezután SUBDIVIDE-oltam az arcokat és EXTRUDE-oltam ki minden másodikat, hogy a sakk mintát megkapjam. Ezt a CHECKER DESELECT(F3 billentyű és a keresőbe be kell írni) utasítással gyorsabban el lehet érni, mintha egyesével kellene bejelölgetni a kívánt arckat.
+
+A bástya esetében több EXTRUDE parancsot végeztem függőlegesen felfelé ívelve, hogy magasságot adjak neki, és rövidebb részeken el is "vágtam", hogy éppen bemélyedéseket, vagy kiugrásokat készítsek rajta, hogy kicsit dizájnosabb legyen, ne csak egy egyszerű sima fal.
+Ezt a SCALE(s billentyű) paranccsal végeztem el.
+
+A várfal is egy kockából indult ki, csak azt meghosszabbítottam az x tengely mentén, hogy úgy is nézzen ki, mint egy fal és akkor a bástyához hasonlóan több EXTRUDE és SCALE paranccsal építettem fel továbbá a tetején a mintázatot, szintén a SUBDIVIDE és EXTRUDE parancsokkal végeztem el.
+
+És végül maga a vár. A többihez hasonlóan kockából készült, ami meg lett nagyobbítva a SCALE paranccsal, majd EXTRUDE-olva lett, és SUBDIVIDE-olva, hogy a hátulsó része felül ágaskodjon az elején és annak is a tetejére a megszokott sakk mintázatot tettem.
+
+Az anyag amit használtam az épületeimre a MATERIAL PROPERTIES ablakban állítottam be, a BASE COLOR-t és a METALLIC értéket.
+
+Elmentettem alakzataim .blend formátumban is, azonnal a projekt mappába az assets/models elérési útvonalra.
+A tananyag szerint EXPORT-áltam alakzataim, FILE -> EXPORT -> WAVEFRONT(.obj) és ott beállítottam a kötelező beállításokat: az INCLUDE alatt SELECTION ONLY, OBJECTS AS OBJ OBJECTS, a GEOMETRY alatt, pedig az APPLY MODIFIERS, WRITE NORMALS, INCLUDE UVS, WRITE MATERIALS, TRIANGULATE FACES.
+A TRANSFORM alatt a beállítások, pedig: SCALE = 1.00, PATH MODE: AUTO, FORWARD: -Z FORWARD, UP: Y UP.

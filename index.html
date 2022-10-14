@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="hu">
+  <head>
+    <meta charset="utf-8" />
+    <title>Középkori vár - by: Bálint Tibor</title>
+    <link href="/assets/favicon/castle.ico" rel="icon" type="image/x-icon" />
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+      }
+      #container {
+        position: absolute;
+        width: 100vw;
+        display: flex;
+        justify-content: space-between;
+      }
+      #description {
+        color: white;
+        margin-left: 30px;
+        font-size: 1.2rem;
+      }
+      #legend {
+        color: white;
+        margin-top: 1vh;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="container">
+      <div id="description">
+        <p>Bálint Tibor</p>
+        <p>BZG4NB</p>
+        <p>Programtervező informatika</p>
+        <p>2020/21 őszi szemeszter</p>
+      </div>
+
+      <div id="legend">
+        <h3>Billentyű magyarázatok:</h3>
+        <p>i billentyű : A képernyőn található szöveg eltűntetése</p>
+        <p>
+          CTRL + SHIFT + R : Az oldal úratöltése (minden alaphelyzetbe áll
+          vissza)
+        </p>
+        <p>n billentyű: Nappalra váltás</p>
+        <p>e billentyű: Éjszakára váltás</p>
+        <p>f billentyű: Fáklyákat bekapcsolni</p>
+        <p>g billentyű: Fáklyákat kikapcsolni</p>
+        <p>r billentyű: A rejtett ajtót felfedni</p>
+        <p>w billentyű: A rejtett ajtót megjeleníteni</p>
+        <p>q billentyű: A rejtett ajtót eltűntetni</p>
+        <p>1 billentyű a betűk felett: A falakat eltűntetni</p>
+        <p>2 billentyű a betűk felett: A falakat megjeleníteni</p>
+      </div>
+    </div>
+    <script type="module">
+      import * as THREE from "./js-r119/build/three.module.js";
+      import { TrackballControls } from "./js-r119/examples/jsm/controls/TrackballControls.js";
+      import { OBJLoader } from "./js-r119/examples/jsm/loaders/OBJLoader.js";
+      import { MTLLoader } from "./js-r119/examples/jsm/loaders/MTLLoader.js";
+      import { GUI } from "./js-r119/examples/jsm/libs/dat.gui.module.js";
+      import { TWEEN } from "./js-r119/examples/jsm/libs/tween.module.min.js";
+
+      // Globális változók
+      var WIDTH, HEIGHT, aspectRatio;
+      var renderer;
+      var scene, camera;
+      var controls;
+      var gateMove;
+      var stats;
+      var bastionFL, bastionFR, bastionRL, bastionRR;
+      var wallFL, wallFR, wallLeft, wallBack, wallRight;
+      var castle;
+      var gate;
+      var isTweening = false;
+      var descText = document.getElementById("description");
+      var legendText = document.getElementById("legend");
+      var dayLight = 0xffe985;
+      var nightLight = 0x1d56b3;
+
+      loaderBastion();
+
+      // Külső tartalmak betöltése
+
+      // Bástyák betöltése
+      function loaderBastion() {
+        var bastion = new OBJLoader();
+        var material = "assets/models/bastya.mtl";
+        var mtlLoader = new MTLLoader();
+
+        mtlLoader.load(material, (materials) => {
+          materials.preload();
+          bastion.setMaterials(materials).load(
+            // Forrás URL
+            "assets/models/bastya.obj",
+            (object) => {
+              bastionFL = object;
+              bastionFL.scale.set(1, 0.7, 1);
+              bastionFL.position.set(-12, 0.75, 13);
+
+              bastionFR = bastionFL.clone();
+              bastionFR.position.set(12, 0.75, 13);
+
+              bastionRL = bastionFL.clone();
+              bastionRL.position.set(-12, 0.75, -13);
+
+              bastionRR = bastionFL.clone();
+              bastionRR.position.set(12, 0.75, -13);
+
+              // Anyag hozzárendelése
+              bastionFL.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              bastionFR.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              bastionRL.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              bastionRR.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+            },
+            // Betöltés előrehaladása közben hívódik
+            (xhr) => {
+              console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+            },
+            // Hibás betöltés esetén
+            (error) => {
+              console.log("An error happened: " + error);
+            }
+          );
+
+          loaderWall();
+        });
+      }
+      // Falak betöltése
+      function loaderWall() {
+        var wall = new OBJLoader();
+        var material = "assets/models/fal.mtl";
+        var mtlLoader = new MTLLoader();
+
+        mtlLoader.load(material, (materials) => {
+          materials.preload();
+          wall.setMaterials(materials).load(
+            // Forrás URL
+            "assets/models/fal.obj",
+            (object) => {
+              wallFL = object;
+              wallFL.scale.set(0.454, 0.3, 0.5);
+              wallFL.position.set(-6.3, 0.05, 13);
+
+              wallFR = wallFL.clone();
+              wallFR.position.set(6.3, 0.05, 13);
+
+              wallLeft = wallFL.clone();
+              wallLeft.scale.set(1.146, 0.3, 0.5);
+              wallLeft.rotation.y = -1.0 * THREE.MathUtils.degToRad(90);
+              wallLeft.position.set(-12, 0.05, 0);
+
+              wallBack = wallFL.clone();
+              wallBack.scale.set(1.05, 0.3, 0.5);
+              wallBack.position.set(0, 0.05, -13);
+
+              wallRight = wallLeft.clone();
+              wallRight.position.set(12, 0.05, 0);
+
+              // Anyag hozzárendelése
+              wallFL.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              wallFR.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              wallLeft.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              wallBack.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              wallRight.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              loaderCastle();
+            },
+            // Betöltés előrehaladása közben hívódik
+            (xhr) => {
+              console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+            },
+            // Hibás betöltés esetén
+            (error) => {
+              console.log("An error happened: " + error);
+            }
+          );
+        });
+      }
+
+      function loaderCastle() {
+        var castleObj = new OBJLoader();
+        var material = "assets/models/var.mtl";
+        var mtlLoader = new MTLLoader();
+
+        mtlLoader.load(material, (materials) => {
+          materials.preload();
+          castleObj.setMaterials(materials).load(
+            // Forrás URL
+            "assets/models/var.obj",
+            (object) => {
+              castle = object;
+              castle.scale.set(0.5, 0.5, 0.5);
+              castle.position.set(-2, 1.67, -5);
+
+              // Anyag hozzárendelése
+              castle.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.material.side = THREE.DoubleSide;
+                  child.material.shininess = 70;
+                }
+              });
+
+              init();
+            },
+            // Betöltés előrehaladása közben hívódik
+            (xhr) => {
+              console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
+            },
+            // Hibás betöltés esetén
+            (error) => {
+              console.log("An error happened: " + error);
+            }
+          );
+        });
+      }
+
+      // Vár kapu -> Three.js
+      function createGate() {
+        var gateGeometry = new THREE.BoxGeometry(3, 4.3, 0.3);
+        var gateMaterial = new THREE.MeshPhongMaterial({
+          map: new THREE.TextureLoader().load("assets/texture/door.jpg"),
+          shininess: 70,
+          side: THREE.DoubleSide,
+        });
+        gate = new THREE.Mesh(gateGeometry, gateMaterial);
+        gate.name = "gate";
+        gate.position.set(0, 2.2, 13);
+        scene.add(gate);
+      }
+
+      function init() {
+        // Böngésző ablakméret lekérése és méretarány számítása
+        HEIGHT = window.innerHeight;
+        WIDTH = window.innerWidth;
+        aspectRatio = WIDTH / HEIGHT;
+
+        // Textúrák betöltése:
+        var textureLoader = new THREE.TextureLoader();
+        var gravel = textureLoader.load("assets/gravel/GravelColor.jpg");
+        var gravelBump = textureLoader.load(
+          "assets/gravel/GravelDisplacement.jpg"
+        );
+        var brick = textureLoader.load("assets/texture/brick.jpg");
+        var tile = textureLoader.load("assets/texture/tile.jpg");
+        var wood = textureLoader.load("assets/texture/wood.jpg");
+        var hay = textureLoader.load("assets/texture/hay.jpg");
+        var treasure = textureLoader.load("assets/texture/treasure.jpg");
+
+        // Renderer létrehozása és DOM-hoz adása
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(WIDTH, HEIGHT);
+        renderer.setClearColor(0x000000);
+        document.body.appendChild(renderer.domElement);
+
+        // Színtér létrehozása
+        scene = new THREE.Scene();
+
+        // Kamera létrehozása és vetítési paramétereinek beállítása
+        camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.1, 1000);
+        camera.position.set(0, 12, 30);
+        camera.lookAt(scene.position);
+
+        // Talaj -> Three.js
+        var groundGeometry = new THREE.PlaneGeometry(70, 70);
+        var groundMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        groundMaterial.map = gravel;
+        groundMaterial.bumpMap = gravelBump;
+        groundMaterial.bumpScale = 0.5;
+        var groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+        groundMesh.recieveShadow = true;
+        groundMesh.castShadow = true;
+        groundMesh.rotation.x = -1.0 * THREE.MathUtils.degToRad(90);
+        scene.add(groundMesh);
+
+        // Templom -> Three.js
+
+        var groupChurch = new THREE.Group();
+
+        // Templom hajó
+        var churchBaseGeometry = new THREE.BoxGeometry(2, 2, 3.5);
+        var churchBaseMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        churchBaseMaterial.map = brick;
+        var churchBaseMesh = new THREE.Mesh(
+          churchBaseGeometry,
+          churchBaseMaterial
+        );
+        churchBaseMesh.recieveShadow = true;
+        churchBaseMesh.castShadow = true;
+        churchBaseMesh.position.set(0, 1.02, 0);
+        groupChurch.add(churchBaseMesh);
+
+        // Templom torony
+        var churchTowerGeometry = new THREE.BoxGeometry(2, 4.5, 2);
+        var churchTowerMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        churchTowerMaterial.map = brick;
+        var churchTowerMesh = new THREE.Mesh(
+          churchTowerGeometry,
+          churchTowerMaterial
+        );
+        churchTowerMesh.recieveShadow = true;
+        churchTowerMesh.castShadow = true;
+        churchTowerMesh.position.set(0, 2.27, 2.751);
+        groupChurch.add(churchTowerMesh);
+
+        // Templom tető
+        var churchRoofGeometry = new THREE.ConeGeometry(1.4, 2, 4);
+        var churchRoofMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        churchRoofMaterial.map = tile;
+        var churchRoofMesh = new THREE.Mesh(
+          churchRoofGeometry,
+          churchRoofMaterial
+        );
+        churchRoofMesh.recieveShadow = true;
+        churchRoofMesh.castShadow = true;
+        churchRoofMesh.position.set(0, 5.525, 2.75);
+        churchRoofMesh.rotation.y = -1.0 * THREE.MathUtils.degToRad(45);
+        groupChurch.add(churchRoofMesh);
+
+        groupChurch.position.set(6, 0, 4);
+
+        scene.add(groupChurch);
+
+        // Szekér -> Three.js
+
+        // Szekér csoport, az összes elemet egy helyre hozzáadni
+        var groupCart = new THREE.Group();
+
+        var holderCartBody = new THREE.Object3D();
+        // Alap
+        var cartBaseGeometry = new THREE.BoxGeometry(1.5, 2, 0.1);
+        var cartBaseMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartBaseMaterial.map = wood;
+        var cartBaseMesh = new THREE.Mesh(cartBaseGeometry, cartBaseMaterial);
+        cartBaseMesh.recieveShadow = true;
+        cartBaseMesh.castShadow = true;
+        cartBaseMesh.position.set(7, 0.6, 7);
+        cartBaseMesh.rotation.x = -1.0 * THREE.MathUtils.degToRad(90);
+        holderCartBody.add(cartBaseMesh);
+
+        // Jobb oldali fal
+        var cartSideRGeometry = new THREE.BoxGeometry(2, 1, 0.1);
+        var cartSideRMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartSideRMaterial.map = wood;
+        var cartSideRMesh = new THREE.Mesh(
+          cartSideRGeometry,
+          cartSideRMaterial
+        );
+        cartSideRMesh.recieveShadow = true;
+        cartSideRMesh.castShadow = true;
+        cartSideRMesh.position.set(6.2, 1.05, 7);
+        cartSideRMesh.rotation.y = -1.0 * THREE.MathUtils.degToRad(90);
+        holderCartBody.add(cartSideRMesh);
+
+        // Bal oldali fal
+        var cartSideLGeometry = new THREE.BoxGeometry(2, 0.9, 0.08);
+        var cartSideLMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartSideLMaterial.map = wood;
+        var cartSideLMesh = new THREE.Mesh(
+          cartSideLGeometry,
+          cartSideLMaterial
+        );
+        cartSideLMesh.recieveShadow = true;
+        cartSideLMesh.castShadow = true;
+        cartSideLMesh.position.set(7.789, 1, 7);
+        cartSideLMesh.rotation.y = -1.0 * THREE.MathUtils.degToRad(90);
+        holderCartBody.add(cartSideLMesh);
+
+        // Hát oldali fal
+        var cartBackGeometry = new THREE.BoxGeometry(1.6, 0.9, 0.08);
+        var cartBackMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartBackMaterial.map = wood;
+        var cartBackMesh = new THREE.Mesh(cartBackGeometry, cartBackMaterial);
+        cartBackMesh.recieveShadow = true;
+        cartBackMesh.castShadow = true;
+        cartBackMesh.position.set(7, 1.02, 5.97);
+        cartBackMesh.rotation.z = -1.0 * THREE.MathUtils.degToRad(2);
+        holderCartBody.add(cartBackMesh);
+
+        // Szekér rúd
+        var cartHandleGeometry = new THREE.CylinderGeometry(
+          0.07,
+          0.07,
+          1.5,
+          32
+        );
+        var cartHandleMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartHandleMaterial.map = wood;
+        var cartHandleMesh = new THREE.Mesh(
+          cartHandleGeometry,
+          cartHandleMaterial
+        );
+        cartHandleMesh.recieveShadow = true;
+        cartHandleMesh.castShadow = true;
+        cartHandleMesh.position.set(7, 0.6, 8.75);
+        cartHandleMesh.rotation.x = -1.0 * THREE.MathUtils.degToRad(90);
+        holderCartBody.add(cartHandleMesh);
+        groupCart.add(holderCartBody);
+
+        var holderWheel = new THREE.Object3D();
+
+        // Jobb oldali kerék
+        var cartWheelRGeometry = new THREE.TorusGeometry(0.05, 0.5, 4, 10);
+        var cartWheelRMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartWheelRMaterial.map = wood;
+        var cartWheelRMesh = new THREE.Mesh(
+          cartWheelRGeometry,
+          cartWheelRMaterial
+        );
+        cartWheelRMesh.recieveShadow = true;
+        cartWheelRMesh.castShadow = true;
+        cartWheelRMesh.position.set(5.8, 0.55, 7);
+        cartWheelRMesh.rotation.y = -1.0 * THREE.MathUtils.degToRad(90);
+        holderWheel.add(cartWheelRMesh);
+
+        // Bal oldali kerék
+        var cartWheelLGeometry = new THREE.TorusGeometry(0.05, 0.5, 4, 10);
+        var cartWheelLMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          shininess: 70,
+          specular: 0xffffff,
+        });
+        cartWheelLMaterial.map = wood;
+        var cartWheelLMesh = new THREE.Mesh(
+          cartWheelLGeometry,
+          cartWheelLMaterial
+        );
+        cartWheelLMesh.recieveShadow = true;
+        cartWheelLMesh.castShadow = true;
+        cartWheelLMesh.position.set(8.2, 0.55, 7);
+        cartWheelLMesh.rotation.y = -1.0 * THREE.MathUtils.degToRad(90);
+        holderWheel.add(cartWheelLMesh);
+        groupCart.add(holderWheel);
+
+        groupCart.position.set(6, 0, -13);
+        groupCart.rotation.y = -1.0 * THREE.MathUtils.degToRad(40);
+
+        scene.add(groupCart);
+
+        // Betöltött objektumok
+
+        // Bástya
+
+        var groupWall = new THREE.Group();
+        var holderBastion = new THREE.Object3D();
+
+        holderBastion.add(bastionFL);
+        holderBastion.add(bastionFR);
+        holderBastion.add(bastionRL);
+        holderBastion.add(bastionRR);
+        groupWall.add(holderBastion);
+
+        var holderWall = new THREE.Object3D();
+
+        holderWall.add(wallFL);
+        holderWall.add(wallFR);
+        holderWall.add(wallLeft);
+        holderWall.add(wallBack);
+        holderWall.add(wallRight);
+        groupWall.add(holderWall);
+
+        scene.add(groupWall);
+
+        var groupHay = new THREE.Group();
+
+        // Széna kazal
+        var hay1Geometry = new THREE.BoxGeometry(1, 1, 2);
+        var hay1Material = new THREE.MeshPhongMaterial({
+          map: hay,
+          side: THREE.DoubleSide,
+        });
+        var hay1Mesh = new THREE.Mesh(hay1Geometry, hay1Material);
+        hay1Mesh.position.set(-7, 0.52, 4);
+        groupHay.add(hay1Mesh);
+
+        var hay2Geometry = new THREE.BoxGeometry(1, 1, 2);
+        var hay2Material = new THREE.MeshPhongMaterial({
+          map: hay,
+          side: THREE.DoubleSide,
+        });
+        var hay2Mesh = new THREE.Mesh(hay2Geometry, hay2Material);
+        hay2Mesh.position.set(-6, 0.52, 3);
+        groupHay.add(hay2Mesh);
+
+        var hay3Geometry = new THREE.BoxGeometry(1, 1, 2);
+        var hay3Material = new THREE.MeshPhongMaterial({
+          map: hay,
+          side: THREE.DoubleSide,
+        });
+        var hay3Mesh = new THREE.Mesh(hay3Geometry, hay3Material);
+        hay3Mesh.position.set(-6.5, 1.5, 3.5);
+        groupHay.add(hay3Mesh);
+        groupHay.name = "hay";
+        scene.add(groupHay);
+
+        // Rejtett ajtó
+        var hiddenDoorGeometry = new THREE.BoxGeometry(0.9, 1, 0.1);
+        var hiddenDoorMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          map: new THREE.TextureLoader().load("assets/texture/door.jpg"),
+        });
+        var hiddenDoorMesh = new THREE.Mesh(
+          hiddenDoorGeometry,
+          hiddenDoorMaterial
+        );
+        hiddenDoorMesh.position.set(-7, 0.06, 4);
+        hiddenDoorMesh.rotation.x = -1.0 * THREE.MathUtils.degToRad(90);
+        scene.add(hiddenDoorMesh);
+
+        // Kincs
+        var treasureGeometry = new THREE.BoxGeometry(0.9, 1, 0.1);
+        var tresureMaterial = new THREE.MeshPhongMaterial({
+          side: THREE.DoubleSide,
+          map: treasure,
+        });
+        var tresureMesh = new THREE.Mesh(treasureGeometry, tresureMaterial);
+        tresureMesh.position.set(-7, 0.053, 4);
+        tresureMesh.rotation.x = -1.0 * THREE.MathUtils.degToRad(90);
+        scene.add(tresureMesh);
+
+        // Várkapu
+        createGate();
+
+        // Vár
+        scene.add(castle);
+
+        // Fények
+        var groupTorch = new THREE.Group();
+
+        var torchFR = new THREE.PointLight(0xfcb103, 0, 20);
+        torchFR.position.set(11, 10, 11);
+        groupTorch.add(torchFR);
+
+        var torchFL = new THREE.PointLight(0xfcb103, 0, 20);
+        torchFL.position.set(11, 10, -11);
+        groupTorch.add(torchFL);
+
+        var torchRR = new THREE.PointLight(0xfcb103, 0, 20);
+        torchRR.position.set(-11, 10, 11);
+        groupTorch.add(torchRR);
+
+        var torchRL = new THREE.PointLight(0xfcb103, 0, 20);
+        torchRL.position.set(-11, 10, -11);
+        groupTorch.add(torchRL);
+
+        scene.add(groupTorch);
+
+        // Ambiens fény
+        var ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        // Reflektor fény
+        var reflectorLight = new THREE.SpotLight(dayLight, 0.3);
+        reflectorLight.position.set(0, 100, 100);
+        reflectorLight.angle = Math.PI;
+        (reflectorLight.target = groundMesh),
+          churchBaseMesh,
+          churchRoofMesh,
+          churchTowerMesh,
+          cartBackMesh,
+          cartBaseMesh,
+          cartSideLMesh,
+          cartSideRMesh,
+          cartHandleMesh,
+          cartWheelLMesh,
+          cartWheelRMesh,
+          cartHandleMesh;
+        reflectorLight.name = "reflector";
+        reflectorLight.penumbra = 0.5;
+        reflectorLight.shadow.mapSize.width = 1024;
+        reflectorLight.shadow.mapSize.height = 1024;
+        reflectorLight.castShadow = true;
+        scene.add(reflectorLight);
+
+        // Az ablak későbbi átméretezése esetén visszahívható függvény megadása
+        window.addEventListener("resize", handleWindowResize, false);
+
+        // Kamera vezérlés
+        controls = new TrackballControls(camera, renderer.domElement);
+        controls.rotateSpeed = 5.0;
+        controls.panSpeed = 1.0;
+
+        // Billentyű vezérlés műveletei
+        document.addEventListener("keydown", (e) => {
+          // Szöveg eltűntetés
+          if (e.keyCode === 73) {
+            textHider(descText);
+            textHider(legendText);
+          }
+
+          // Estére váltás
+          if (e.keyCode === 69) {
+            lightChanger(nightLight);
+            ambientLight.intensity = 0.1;
+            torchFR.intensity = 1;
+            torchFL.intensity = 1;
+            torchRR.intensity = 1;
+            torchRL.intensity = 1;
+          }
+
+          // Nappalra váltás
+          if (e.keyCode === 78) {
+            lightChanger(dayLight);
+            ambientLight.intensity = 0.7;
+            torchFR.intensity = 0;
+            torchFL.intensity = 0;
+            torchRR.intensity = 0;
+            torchRL.intensity = 0;
+          }
+
+          // Fáklyák bekapcsolnak
+          if (e.keyCode === 70) {
+            torchFR.intensity = 1;
+            torchFL.intensity = 1;
+            torchRR.intensity = 1;
+            torchRL.intensity = 1;
+          }
+
+          // Fáklyák kikapcsolnak
+          if (e.keyCode === 71) {
+            torchFR.intensity = 0;
+            torchFL.intensity = 0;
+            torchRR.intensity = 0;
+            torchRL.intensity = 0;
+          }
+
+          // Rejtett ajtó eltűntet
+          if (e.keyCode === 81) {
+            scene.remove(hiddenDoorMesh);
+          }
+
+          // Rejtett ajtó megjelenít
+          if (e.keyCode === 87) {
+            scene.add(hiddenDoorMesh);
+          }
+
+          // Várfalak eltűntetése
+          if (e.keyCode === 49) {
+            groupWall.remove(holderWall);
+          }
+
+          // Várfalak megjelenítése
+          if (e.keyCode === 50) {
+            groupWall.add(holderWall);
+          }
+
+          // Rejtett ajtót felfed
+          if (e.keyCode === 82) {
+            reveal(scene.getObjectByName("hay"), 0, 4, 2000);
+          }
+        });
+
+        // A várkapu mozgatása
+        gateMove = new (function () {
+          this.left = function () {
+            takeStepLeft(scene.getObjectByName("gate"), 0, -4, 2000);
+          };
+          this.right = function () {
+            takeStepRight(scene.getObjectByName("gate"), 0, 4, 2000);
+          };
+        })();
+
+        addControlGui(gateMove);
+        animate();
+      }
+
+      function lightChanger(lightC) {
+        scene.getObjectByName("reflector").color.setHex(lightC);
+      }
+
+      function textHider(text) {
+        if (text.style.display === "block") {
+          text.style.display = "none";
+        } else {
+          text.style.display = "block";
+        }
+      }
+
+      function reveal(object, start, end, time) {
+        if (!isTweening) {
+          new TWEEN.Tween(object.position)
+            .to({ x: end }, time)
+            .easing(TWEEN.Easing.Quartic.InOut)
+            .onStart(function () {
+              isTweening = true;
+              object.position.x = start;
+            })
+            .start();
+        }
+      }
+
+      function takeStepRight(object, start, end, time) {
+        if (!isTweening) {
+          new TWEEN.Tween(object.position)
+            .to({ x: end }, time)
+            .easing(TWEEN.Easing.Quartic.InOut)
+            .onStart(function () {
+              isTweening = true;
+              object.position.x = start;
+            })
+            .onComplete(function () {
+              // A végső eltolási értékek alkalmazása
+              object.updateMatrix();
+              object.geometry.applyMatrix4(object.matrix);
+              object.position.set(0, 0, 0);
+              object.updateMatrix();
+              isTweening = false;
+            })
+            .start();
+        }
+      }
+
+      function takeStepLeft(object, start, end, time) {
+        if (!isTweening) {
+          new TWEEN.Tween(object.position)
+            .to({ x: end }, time)
+            .easing(TWEEN.Easing.Quartic.Out)
+            .onStart(function () {
+              isTweening = true;
+              object.position.x = start;
+            })
+            .onComplete(function () {
+              // A végső eltolási értékek alkalmazása
+              object.updateMatrix();
+              object.geometry.applyMatrix4(object.matrix);
+              object.position.set(0, 0, 0);
+              object.updateMatrix();
+              isTweening = false;
+            })
+            .start();
+        }
+      }
+
+      function addControlGui(controlObject, controlLight) {
+        var gui = new GUI();
+        gui.add(controlObject, "left").name("Várkapu kinyit");
+        gui.add(controlObject, "right").name("Várkapu becsuk");
+      }
+
+      function handleWindowResize() {
+        // Az ablak átméretezése esetén a kamera vetítési paraméterek újraszámolása
+        HEIGHT = window.innerHeight;
+        WIDTH = window.innerWidth;
+        console.log("WIDTH=" + WIDTH + "; HEIGHT=" + HEIGHT);
+        renderer.setSize(WIDTH, HEIGHT);
+        aspectRatio = WIDTH / HEIGHT;
+        camera.aspect = aspectRatio;
+        camera.updateProjectionMatrix();
+
+        render();
+      }
+
+      function animate() {
+        // Újabb képkocka rajzolásának kérése.
+        // Maximálisan 60 FPS-t biztosít a rendszer.
+        requestAnimationFrame(animate);
+        // Kamera vezérlés
+        controls.update();
+
+        TWEEN.update();
+
+        render();
+      }
+
+      function render() {
+        // 3D -> 2D vetített kép kiszámítása.
+        // scene 3D színtér képe a camera kamera szemszögéből.
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>

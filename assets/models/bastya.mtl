@@ -1,0 +1,12 @@
+# Blender MTL File: 'bastya.blend'
+# Material Count: 1
+
+newmtl silverWall
+Ns 60.415285
+Ka 0.174864 0.174864 0.174864
+Kd 0.522222 0.522222 0.522222
+Ks 0.303419 0.303419 0.303419
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 3
